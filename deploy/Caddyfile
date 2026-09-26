@@ -1,0 +1,6 @@
+{$KABAN_PUBLIC_URL:http://localhost} {
+    basic_auth {
+        {$KABAN_ADMIN_USER} {$KABAN_ADMIN_PASSWORD_HASH}
+    }
+    reverse_proxy admin:8088
+}

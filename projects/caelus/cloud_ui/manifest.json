@@ -1,0 +1,6 @@
+{
+  "project_id": "caelus",
+  "entry": "index.html",
+  "route": "/projects/caelus/",
+  "assets": ["index.html", "app.js", "styles.css"]
+}

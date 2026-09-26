@@ -1,0 +1,55 @@
+id: caelus
+name: CAELUS
+default_language: ru
+supported_languages:
+  - ru
+  - en
+timezone: Pacific/Auckland
+
+ai:
+  model: gpt-5.6-luna
+  reasoning_effort: low
+
+uniqueness:
+  history_days: 90
+  warning_threshold: 0.76
+  hard_threshold: 0.80
+  max_regeneration_attempts: 3
+
+publication:
+  telegram:
+    album_group_size: 6
+
+cloud:
+  adapter: "projects.caelus.cloud_adapter:adapter"
+
+automation:
+  enabled: true
+  adapter: "projects.caelus.scheduler:run_job"
+  jobs:
+    - id: generate_ru
+      handler: generate
+      enabled: true
+      cron: "0 6 * * *"
+      params:
+        language: ru
+        mode: ai
+        target_date_offset_days: 0
+      misfire_grace_minutes: 30
+      retry:
+        interval_minutes: 10
+        window_minutes: 120
+        max_attempts: 12
+
+    - id: publish_ru
+      handler: publish
+      enabled: true
+      cron: "0 8 * * *"
+      params:
+        language: ru
+        target_date_offset_days: 0
+      misfire_grace_minutes: 30
+      retry:
+        interval_minutes: 10
+        window_minutes: 180
+        max_attempts: 18

@@ -1,0 +1,9 @@
+{
+  "name": "kaban-cloud-control-plane",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

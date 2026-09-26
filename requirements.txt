@@ -1,0 +1,8 @@
+pillow>=10.0
+openai>=1.60.0
+
+PyYAML>=6.0
+
+croniter>=6.0
+
+boto3>=1.35,<2

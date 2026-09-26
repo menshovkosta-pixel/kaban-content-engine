@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CAELUS Review Console</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <div>
+        <div class="eyebrow">KABAN · PROJECT CAELUS</div>
+        <h1>Review Console</h1>
+        <p>Между звёздами и судьбой</p>
+      </div>
+      <div class="health" id="health">Cloud state: loading…</div>
+    </header>
+
+    <section class="toolbar panel">
+      <label>Дата <input id="date" type="date"></label>
+      <label>Язык
+        <select id="language"><option value="ru">RU</option><option value="en">EN</option></select>
+      </label>
+      <button id="load" class="secondary">Загрузить</button>
+      <span id="revision" class="badge">revision —</span>
+      <span id="approval" class="badge">approval —</span>
+      <span id="publication" class="badge">publication —</span>
+    </section>
+
+    <section class="actions panel">
+      <button data-op="save">Save Changes</button>
+      <button data-op="regenerate_conflicts">Regenerate Conflicts</button>
+      <button data-op="approve">Approve All</button>
+      <button data-op="return_to_draft" class="secondary">Return to Draft</button>
+      <button data-op="generate" class="secondary">Manual Generate</button>
+      <button data-op="publish" class="danger">Manual Publish</button>
+    </section>
+
+    <section id="warning" class="warning hidden"></section>
+    <section id="message" class="message panel">Готово к загрузке.</section>
+    <section id="execution" class="usage panel">Execution: idle</section>
+    <section id="diagnostics" class="usage panel">Uniqueness: loading…</section>
+    <section id="usage" class="usage panel"></section>
+    <section id="diagnostics" class="usage panel">Uniqueness diagnostics: —</section>
+    <section id="cards" class="cards"></section>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

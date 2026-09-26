@@ -1,0 +1,14 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+data/
+/runtime/
+/deploy/cloudflare/worker/.generated-assets/
+/.kaban-cloud-tmp/
+
+.superpowers/
+
+/generated/
+/.pytest_cache/
+/deploy/cloudflare/worker/node_modules/

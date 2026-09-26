@@ -1,0 +1,76 @@
+services:
+  scheduler:
+    build: .
+    image: kaban-content-engine:1.13
+    command: ["python", "scheduler.py", "run", "--poll-seconds", "30"]
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      KABAN_RUNTIME_DIR: /app/runtime
+    user: "${KABAN_UID:-1000}:${KABAN_GID:-1000}"
+    volumes:
+      - ./data/generated:/app/generated
+      - ./data/runtime:/app/runtime
+    healthcheck:
+      test: ["CMD", "python", "scheduler.py", "health", "--max-age-seconds", "120"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  admin:
+    build: .
+    image: kaban-content-engine:1.13
+    command: ["python", "admin_app.py"]
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      KABAN_RUNTIME_DIR: /app/runtime
+      KABAN_ADMIN_HOST: "0.0.0.0"
+      KABAN_ADMIN_PORT: "8088"
+    user: "${KABAN_UID:-1000}:${KABAN_GID:-1000}"
+    volumes:
+      - ./data/generated:/app/generated
+      - ./data/runtime:/app/runtime
+    expose: ["8088"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8088/healthz', timeout=3).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      KABAN_PUBLIC_URL: "${KABAN_PUBLIC_URL:-http://localhost}"
+      KABAN_ADMIN_USER: "${KABAN_ADMIN_USER:-replace_me}"
+      KABAN_ADMIN_PASSWORD_HASH: "${KABAN_ADMIN_PASSWORD_HASH:-replace_with_caddy_hash}"
+    depends_on:
+      admin:
+        condition: service_healthy
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  caddy_data:
+  caddy_config:
