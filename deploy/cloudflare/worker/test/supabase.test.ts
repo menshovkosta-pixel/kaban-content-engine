@@ -140,3 +140,70 @@ test("usage labels exact database size without upgrading estimated provider metr
   assert.equal(db.quota_level,"warning");
   assert.equal(egress.quality,"estimated");
 });
+
+test("sb_secret Supabase key is sent as apikey without Bearer Authorization", async () => {
+  const calls: Array<{ headers: Headers }> = [];
+
+  const fakeFetch = async (_input: any, init: any) => {
+    calls.push({ headers: new Headers(init.headers) });
+    return new Response("[]", { status: 200 });
+  };
+
+  const store = new SupabaseWorkerStore(
+    {
+      ...env,
+      SUPABASE_SERVICE_KEY: "sb_secret_test_key",
+    } as any,
+    fakeFetch as any,
+  );
+
+  await store.getContent("caelus", "2026-09-27:ru");
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].headers.get("apikey"), "sb_secret_test_key");
+  assert.equal(calls[0].headers.get("Authorization"), null);
+});
+
+test("legacy JWT Supabase service key keeps Bearer Authorization", async () => {
+  const calls: Array<{ headers: Headers }> = [];
+
+  const fakeFetch = async (_input: any, init: any) => {
+    calls.push({ headers: new Headers(init.headers) });
+    return new Response("[]", { status: 200 });
+  };
+
+  const legacyKey = "eyJlegacy.service.role.jwt";
+
+  const store = new SupabaseWorkerStore(
+    {
+      ...env,
+      SUPABASE_SERVICE_KEY: legacyKey,
+    } as any,
+    fakeFetch as any,
+  );
+
+  await store.getContent("caelus", "2026-09-27:ru");
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].headers.get("apikey"), legacyKey);
+  assert.equal(calls[0].headers.get("Authorization"), `Bearer ${legacyKey}`);
+});
+test("Supabase store does not invoke fetcher as a store method", async () => {
+  let receiver: unknown = null;
+
+  function fakeFetch(this: unknown) {
+    receiver = this;
+    return Promise.resolve(
+      new Response("[]", { status: 200 }),
+    );
+  }
+
+  const store = new SupabaseWorkerStore(
+    env,
+    fakeFetch as any,
+  );
+
+  await store.getContent("caelus", "2026-09-27:ru");
+
+  assert.notEqual(receiver, store);
+});
