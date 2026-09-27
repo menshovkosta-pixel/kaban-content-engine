@@ -112,59 +112,81 @@ def validate_payload(payload: dict[str, Any], recent_texts: dict[str, list[str]]
                         matched_text=text_b,
                     ))
 
-    # Different semantic fields inside one sign must not duplicate each other.
+    # Different semantic fields must not duplicate each other anywhere
+    # inside the same daily content set, including across different signs.
+    #
     # CONTENT_FIELDS is ordered from general/base content toward more
-    # specialized blocks, so the later field becomes the regeneration target.
+    # specialized blocks. For a cross-field conflict the later semantic
+    # field is always the regeneration target, regardless of sign order.
     cross_field_threshold = (
         float(same_day_hard_threshold)
         if same_day_hard_threshold is not None
         else 0.84
     )
 
+    field_priority = {
+        field: index
+        for index, field in enumerate(CONTENT_FIELDS)
+    }
+
+    cross_field_values: list[tuple[str, str, str]] = []
     for sign in SIGN_ORDER:
         item = signs.get(sign, {})
         if not isinstance(item, dict):
             continue
 
-        values = [
-            (field, get_field(item, field).strip())
-            for field in CONTENT_FIELDS
-            if get_field(item, field).strip()
-        ]
+        for field in CONTENT_FIELDS:
+            value = get_field(item, field).strip()
+            if value:
+                cross_field_values.append((sign, field, value))
 
-        for i, (field_a, text_a) in enumerate(values):
-            for field_b, text_b in values[i + 1:]:
-                result = compare_texts(text_a, text_b)
+    for i, (sign_a, field_a, text_a) in enumerate(cross_field_values):
+        for sign_b, field_b, text_b in cross_field_values[i + 1:]:
+            # Same-field comparisons are already handled above by
+            # same_day_repetition.
+            if field_a == field_b:
+                continue
 
-                first_a = _first_sentence(text_a)
-                first_b = _first_sentence(text_b)
-                repeated_opening = (
-                    len(first_a) >= 40
-                    and first_a == first_b
-                )
+            result = compare_texts(text_a, text_b)
 
-                if result.score < cross_field_threshold and not repeated_opening:
-                    continue
+            first_a = _first_sentence(text_a)
+            first_b = _first_sentence(text_b)
+            repeated_opening = (
+                len(first_a) >= 40
+                and first_a == first_b
+            )
 
-                reason = (
-                    f"same opening sentence"
-                    if repeated_opening and result.score < cross_field_threshold
-                    else f"similarity {result.score:.0%}"
-                )
+            if result.score < cross_field_threshold and not repeated_opening:
+                continue
 
-                issues.append(ValidationIssue(
-                    "error",
-                    "cross_field_repetition",
-                    (
-                        f"Fields {field_a} and {field_b} for {sign} "
-                        f"repeat each other ({reason})."
-                    ),
-                    sign,
-                    field_b,
-                    result.score,
-                    current_text=text_b,
-                    matched_text=text_a,
-                ))
+            if field_priority[field_a] < field_priority[field_b]:
+                source_sign, source_field, source_text = sign_a, field_a, text_a
+                target_sign, target_field, target_text = sign_b, field_b, text_b
+            else:
+                source_sign, source_field, source_text = sign_b, field_b, text_b
+                target_sign, target_field, target_text = sign_a, field_a, text_a
+
+            reason = (
+                "same opening sentence"
+                if repeated_opening and result.score < cross_field_threshold
+                else f"similarity {result.score:.0%}"
+            )
+
+            issues.append(ValidationIssue(
+                "error",
+                "cross_field_repetition",
+                (
+                    f"Fields {source_sign}/{source_field} and "
+                    f"{target_sign}/{target_field} repeat each other "
+                    f"({reason})."
+                ),
+                target_sign,
+                target_field,
+                result.score,
+                matched_sign=source_sign,
+                current_text=target_text,
+                matched_text=source_text,
+            ))
 
     # recent_texts оставлен в сигнатуре для backward compatibility v4.7.
     # Начиная с v4.8 исторические сравнения должны быть привязаны к тому же знаку,
