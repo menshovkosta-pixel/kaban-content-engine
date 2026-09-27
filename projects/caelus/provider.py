@@ -141,8 +141,15 @@ def _mock_regenerated_sign(base: dict[str, str], language: str, sign: str, attem
         ]
     idx = (sign_index + attempt - 1) % len(leads)
     end_idx = (sign_index * 2 + attempt) % len(endings)
-    lead = leads[idx]
-    ending = endings[end_idx]
+
+    card_lead = leads[idx]
+    general_lead = leads[(idx + 1) % len(leads)]
+    career_lead = leads[(idx + 2) % len(leads)]
+
+    general_ending = endings[end_idx]
+    love_ending = endings[(end_idx + 1) % len(endings)]
+    advice_ending = endings[(end_idx + 2) % len(endings)]
+
     # Меняем композицию каждого поля, а не добавляем технический суффикс к старому тексту.
     card_parts = [part.strip() for part in base["card"].split(".") if part.strip()]
     card_detail = card_parts[-1] + "." if card_parts else base["card"]
@@ -150,11 +157,11 @@ def _mock_regenerated_sign(base: dict[str, str], language: str, sign: str, attem
     general_detail = general_parts[-1] + "." if general_parts else base["general"]
     tone_cycle = ("energetic", "calm", "curious", "reflective")
     return {
-        "card": f"{lead} {card_detail}",
-        "general": f"{lead} {general_detail} {ending}",
-        "love": f"{base['love']} {ending}",
-        "career_money": f"{lead} {base['career_money']}",
-        "advice": f"{ending} {base['advice']}",
+        "card": f"{card_lead} {card_detail}",
+        "general": f"{general_lead} {general_detail} {general_ending}",
+        "love": f"{base['love']} {love_ending}",
+        "career_money": f"{career_lead} {base['career_money']}",
+        "advice": f"{advice_ending} {base['advice']}",
         "_diversity": {
             "theme": f"{sign}:regenerated-theme-{attempt}",
             "situation": f"{sign}:regenerated-situation-{attempt}",

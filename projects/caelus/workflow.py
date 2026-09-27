@@ -100,7 +100,7 @@ def preview_diversity(day: str, language: str, settings: DiversitySettings | Non
     )
     conflicts = [
         issue for issue in issues
-        if issue.get("severity") == "error" and issue.get("code") in {"history_repetition", "same_day_repetition"}
+        if issue.get("severity") == "error" and issue.get("code") in {"history_repetition", "same_day_repetition", "cross_field_repetition"}
     ]
     return {
         "settings": selected.to_dict(),
@@ -316,7 +316,7 @@ def _store_regeneration_feedback(
         issue.get("severity") == "error"
         and issue.get("sign") == sign
         and (field is None or issue.get("field") == field)
-        and issue.get("code") in {"history_repetition", "same_day_repetition"}
+        and issue.get("code") in {"history_repetition", "same_day_repetition", "cross_field_repetition"}
         for issue in issues
     )
     uniqueness["last_regeneration"] = {
@@ -439,7 +439,7 @@ def regenerate_conflicts(day: str, language: str) -> tuple[dict[str, Any], list[
         pair = (str(issue.get("sign") or ""), str(issue.get("field") or ""))
         if (
             issue.get("severity") == "error"
-            and issue.get("code") in {"history_repetition", "same_day_repetition"}
+            and issue.get("code") in {"history_repetition", "same_day_repetition", "cross_field_repetition"}
             and pair[0] in SIGN_ORDER
             and pair[1] in CONTENT_FIELDS
             and pair not in pairs
@@ -493,7 +493,7 @@ def regenerate_conflicts(day: str, language: str) -> tuple[dict[str, Any], list[
     unresolved = any(
         issue.get("severity") == "error"
         and (str(issue.get("sign") or ""), str(issue.get("field") or "")) in changed_pairs
-        and issue.get("code") in {"history_repetition", "same_day_repetition"}
+        and issue.get("code") in {"history_repetition", "same_day_repetition", "cross_field_repetition"}
         for issue in final_issues
     )
     generation = payload.setdefault("generation", {})

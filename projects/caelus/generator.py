@@ -15,7 +15,7 @@ from projects.caelus.validators import get_field, has_errors, set_field
 from kaban.ai.usage import merge_usage, provider_usage
 
 
-REGENERATABLE_UNIQUENESS_CODES = {"history_repetition", "same_day_repetition"}
+REGENERATABLE_UNIQUENESS_CODES = {"history_repetition", "same_day_repetition", "cross_field_repetition"}
 
 
 def _mark_diversity_metadata_stale(payload: dict[str, Any], sign: str, field: str) -> None:
