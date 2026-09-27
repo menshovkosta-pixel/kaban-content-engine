@@ -92,3 +92,26 @@ test("unknown delivery reconciliation is explicit and uses publication endpoint"
   assert.match(calls[0].url, /\/api\/projects\/caelus\/publications\/run-1\/reconcile$/);
   assert.deepEqual(JSON.parse(calls[0].init.body), { step_key: "album:1", state: "sent" });
 });
+
+test("CAELUS UI maps canonical horoscope fields to review-console fields", async () => {
+  const { reviewFieldValue, canonicalFieldName } =
+    await import("../../../../projects/caelus/cloud_ui/app.js");
+
+  const source = {
+    card: "card text",
+    general: "general text",
+    love: "love text",
+    career_money: "career text",
+    advice: "advice text",
+  };
+
+  assert.equal(reviewFieldValue(source, "card"), "card text");
+  assert.equal(reviewFieldValue(source, "overview"), "general text");
+  assert.equal(reviewFieldValue(source, "relationships"), "love text");
+  assert.equal(reviewFieldValue(source, "work_money"), "career text");
+  assert.equal(reviewFieldValue(source, "advice"), "advice text");
+
+  assert.equal(canonicalFieldName("overview"), "general");
+  assert.equal(canonicalFieldName("relationships"), "love");
+  assert.equal(canonicalFieldName("work_money"), "career_money");
+});

@@ -24,7 +24,18 @@ class ControlStore(Protocol):
     def renew_execution(self, execution_id: UUID, owner: str, fence_token: int, lease_seconds: int) -> LeaseClaim: ...
     def claim_resource(self, project_id: str, resource_key: str, execution_id: UUID, lease_seconds: int) -> LeaseClaim: ...
     def load_snapshot(self, project_id: str, spec: MaterializationSpec) -> CanonicalSnapshot: ...
-    def commit_changes(self, command: ExecutionCommand, changes: ChangeSet, *, execution_fence: int, resource_fence: int | None, lease_owner: str | None = None, proposed_revision_id: UUID | None = None) -> CommitResult: ...
+    def commit_changes(
+        self,
+        command: ExecutionCommand,
+        changes: ChangeSet,
+        *,
+        execution_fence: int,
+        resource_fence: int | None,
+        lease_owner: str | None = None,
+        proposed_revision_id: UUID | None = None,
+        resource_key: str | None = None,
+        artifact_rows: tuple[Mapping[str, Any], ...] = (),
+    ) -> CommitResult: ...
     def finish_execution(self, execution_id: UUID, fence_token: int, outcome: str, error: Mapping[str, Any] | None = None) -> None: ...
 
 

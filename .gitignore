@@ -12,3 +12,4 @@ data/
 /generated/
 /.pytest_cache/
 /deploy/cloudflare/worker/node_modules/
+.wrangler/

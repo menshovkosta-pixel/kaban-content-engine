@@ -4,6 +4,7 @@ import hashlib
 import os
 from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib.parse import urlparse
 from uuid import UUID
 
 from .contracts import ImmutableArtifactConflict, ProjectIsolationError
@@ -21,6 +22,12 @@ def _sha256(path: Path) -> str:
 class R2ArtifactStore:
     def __init__(self, *, bucket: str, endpoint_url: str | None = None, access_key_id: str | None = None, secret_access_key: str | None = None, s3_client: Any = None):
         self.bucket = bucket
+
+        if endpoint_url:
+            parsed = urlparse(endpoint_url)
+            if parsed.path not in {"", "/"}:
+                raise ValueError("R2 endpoint must be the account root URL without a bucket path")
+
         if s3_client is None:
             import boto3
             s3_client = boto3.client("s3", endpoint_url=endpoint_url, aws_access_key_id=access_key_id, aws_secret_access_key=secret_access_key, region_name="auto")

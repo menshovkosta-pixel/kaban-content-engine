@@ -200,21 +200,75 @@ class SupabaseControlStore:
         settings = {row["setting_key"]: row.get("value") for row in settings_rows}
         return CanonicalSnapshot(project_id=project_id, content_sets=tuple(sets), history_revisions=tuple(history), settings=settings, artifacts=tuple(artifacts), publication={})
 
-    def commit_changes(self, command: ExecutionCommand, changes: ChangeSet, *, execution_fence: int, resource_fence: int | None, lease_owner: str | None = None, proposed_revision_id: UUID | None = None) -> CommitResult:
+    def commit_changes(
+        self,
+        command: ExecutionCommand,
+        changes: ChangeSet,
+        *,
+        execution_fence: int,
+        resource_fence: int | None,
+        lease_owner: str | None = None,
+        proposed_revision_id: UUID | None = None,
+        resource_key: str | None = None,
+        artifact_rows: tuple[Mapping[str, Any], ...] = (),
+    ) -> CommitResult:
         if changes.new_payload is None or changes.content_set_id is None:
-            return CommitResult(changes.content_set_id, None, changes.expected_version)
+            return CommitResult(
+                changes.content_set_id,
+                None,
+                changes.expected_version,
+            )
+
         if proposed_revision_id is None:
-            raise ValueError("proposed_revision_id обязателен для commit-last")
-        result = self._first(self._rpc(RPC_COMMIT_REVISION, {
-            "p_project_id": command.project_id, "p_execution_id": str(command.execution_id), "p_owner": lease_owner or command.requested_by,
-            "p_execution_fence": execution_fence, "p_resource_key": f"content:{changes.content_set_id}" if resource_fence is not None else None,
-            "p_resource_fence": resource_fence, "p_content_set_id": str(changes.content_set_id), "p_expected_version": changes.expected_version,
-            "p_proposed_revision_id": str(proposed_revision_id), "p_payload": dict(changes.new_payload),
-            "p_content_hash": str(dict(changes.new_payload).get("content_hash") or ""), "p_artifacts": [],
-        }))
+            raise ValueError(
+                "proposed_revision_id ?????????? ??? commit-last"
+            )
+
+        result = self._first(
+            self._rpc(
+                RPC_COMMIT_REVISION,
+                {
+                    "p_project_id": command.project_id,
+                    "p_execution_id": str(command.execution_id),
+                    "p_owner": lease_owner or command.requested_by,
+                    "p_execution_fence": execution_fence,
+                    "p_resource_key": (
+                        resource_key
+                        if resource_fence is not None
+                        else None
+                    ),
+                    "p_resource_fence": resource_fence,
+                    "p_content_key": command.content_key,
+                    "p_content_set_id": str(changes.content_set_id),
+                    "p_expected_version": changes.expected_version,
+                    "p_proposed_revision_id": str(
+                        proposed_revision_id
+                    ),
+                    "p_payload": dict(changes.new_payload),
+                    "p_content_hash": str(
+                        dict(changes.new_payload).get(
+                            "content_hash"
+                        )
+                        or ""
+                    ),
+                    "p_artifacts": [
+                        dict(item)
+                        for item in artifact_rows
+                    ],
+                },
+            )
+        )
+
         if not result:
-            raise VersionConflict("content commit rejected")
-        return CommitResult(UUID(result["content_set_id"]), UUID(result["revision_id"]), int(result["version"]))
+            raise VersionConflict(
+                "content commit rejected"
+            )
+
+        return CommitResult(
+            UUID(result["content_set_id"]),
+            UUID(result["revision_id"]),
+            int(result["version"]),
+        )
 
 
     def create_or_get_publication_run(self, project_id: str, publication_key: str, content_set_id: UUID | None, revision_id: UUID | None, execution_id: UUID | None) -> UUID:

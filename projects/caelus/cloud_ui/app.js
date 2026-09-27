@@ -1,6 +1,24 @@
 const ZODIAC = ["aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"];
+
+
 const EDITABLE_FIELDS = ["card","overview","relationships","work_money","advice"];
 
+const CANONICAL_FIELD_BY_REVIEW_FIELD = {
+  card: "card",
+  overview: "general",
+  relationships: "love",
+  work_money: "career_money",
+  advice: "advice",
+};
+
+export function canonicalFieldName(field) {
+  return CANONICAL_FIELD_BY_REVIEW_FIELD[field] ?? field;
+}
+
+export function reviewFieldValue(source = {}, field) {
+  const canonical = canonicalFieldName(field);
+  return source?.[canonical] ?? source?.[field] ?? "";
+}
 
 export function aucklandDate(value = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -117,7 +135,7 @@ function readFields() {
   for (const card of document.querySelectorAll("[data-sign]")) {
     const sign = card.dataset.sign;
     signs[sign] = {};
-    for (const input of card.querySelectorAll("[data-field]")) signs[sign][input.dataset.field] = input.value;
+    for (const input of card.querySelectorAll("[data-field]")) signs[sign][canonicalFieldName(input.dataset.field)] = input.value;
   }
   return { signs };
 }
@@ -151,7 +169,7 @@ function renderCards(payload, artifacts = []) {
       fieldButton.type = "button"; fieldButton.className = "secondary"; fieldButton.textContent = "Regenerate Field";
       fieldButton.dataset.regenerateField = field; fieldButton.dataset.sign = sign;
       head.append(caption, fieldButton);
-      const textarea = document.createElement("textarea"); textarea.dataset.field = field; textarea.value = source[field] ?? "";
+      const textarea = document.createElement("textarea"); textarea.dataset.field = field; textarea.value = reviewFieldValue(source, field);
       wrap.append(head, textarea); article.append(wrap);
     }
     const actions = document.createElement("div"); actions.className = "card-actions";
@@ -266,7 +284,7 @@ if (typeof document !== "undefined") {
   document.querySelector("#cards").addEventListener("click", (event) => {
     const fieldButton = event.target.closest("[data-regenerate-field]");
     if (fieldButton) {
-      submit("regenerate_field", { sign: fieldButton.dataset.sign, field: fieldButton.dataset.regenerateField, fields: readFields() }).catch((e) => message(String(e)));
+      submit("regenerate_field", { sign: fieldButton.dataset.sign, field: canonicalFieldName(fieldButton.dataset.regenerateField), fields: readFields() }).catch((e) => message(String(e)));
       return;
     }
     const button = event.target.closest("[data-regenerate-sign]");
