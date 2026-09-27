@@ -170,10 +170,13 @@ class SupabaseControlStore:
 
     def load_snapshot(self, project_id: str, spec: MaterializationSpec) -> CanonicalSnapshot:
         content_rows = self._request("GET", "kaban_content_sets", query={"project_id": f"eq.{project_id}", "select": "*"}) or []
+        allowed_content_keys = set(spec.content_keys)
         sets: list[ContentSetSnapshot] = []
         for row in content_rows:
             if row.get("project_id") != project_id:
                 raise ProjectIsolationError("Supabase вернул content_set другого project_id")
+            if allowed_content_keys and row.get("content_key") not in allowed_content_keys:
+                continue
             revision = None
             if row.get("current_revision_id"):
                 rev_rows = self._request("GET", "kaban_content_revisions", query={"project_id": f"eq.{project_id}", "revision_id": f"eq.{row['current_revision_id']}", "select": "*", "limit": "1"}) or []
@@ -183,10 +186,29 @@ class SupabaseControlStore:
                     revision = self._revision(rev_rows[0])
             sets.append(ContentSetSnapshot(UUID(row["content_set_id"]), project_id, row["content_key"], date.fromisoformat(row["content_date"]) if row.get("content_date") else None, row.get("locale"), int(row.get("version") or 0), revision, UUID(row["approved_revision_id"]) if row.get("approved_revision_id") else None, row.get("approved_content_hash")))
         artifact_rows = self._request("GET", "kaban_artifacts", query={"project_id": f"eq.{project_id}", "select": "*"}) or []
+        selected_content_set_ids = {
+            str(item.content_set_id)
+            for item in sets
+        }
+        selected_current_revision_ids = {
+            str(item.current_revision.revision_id)
+            for item in sets
+            if item.current_revision is not None
+        }
+
         artifacts = []
         for row in artifact_rows:
             if row.get("project_id") != project_id:
                 raise ProjectIsolationError("Supabase вернул artifact другого project_id")
+            if spec.artifact_kinds and row.get("kind") not in spec.artifact_kinds:
+                continue
+
+            if allowed_content_keys:
+                if str(row.get("content_set_id") or "") not in selected_content_set_ids:
+                    continue
+                if str(row.get("revision_id") or "") not in selected_current_revision_ids:
+                    continue
+
             artifacts.append(ArtifactRef(UUID(row["artifact_id"]), project_id, UUID(row["content_set_id"]) if row.get("content_set_id") else None, UUID(row["revision_id"]) if row.get("revision_id") else None, row["kind"], row["logical_name"], row["r2_key"], row["sha256"], int(row["size_bytes"]), row["mime_type"], row.get("metadata") or {}))
         # История и settings читаются отдельными запросами только если они нужны adapter-у.
         history: list[RevisionSnapshot] = []
