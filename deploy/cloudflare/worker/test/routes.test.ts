@@ -106,6 +106,65 @@ test("project health route returns authenticated project-scoped summary", async 
   assert.equal(body.unknown_delivery_count,1);
 });
 
+
+test("command route accepts canonical execution id returned as RPC string", async () => {
+  const executionId = "66666666-6666-4666-8666-666666666666";
+  const dispatched: string[] = [];
+
+  const store: any = new FakeStore();
+  store.enableDispatchClaims = true;
+
+  store.createCommand = async (_input: any) => executionId;
+
+  store.getExecution = async (_projectId: string, id: string) =>
+    id === executionId
+      ? [{
+          execution_id: executionId,
+          project_id: "caelus",
+          operation: "regenerate_field",
+          state: "queued",
+          wait_condition: null,
+          misfire_deadline_at: null,
+          retry_deadline_at: null,
+        }]
+      : [];
+
+  const github = {
+    async dispatch(id: string) {
+      dispatched.push(id);
+    },
+  };
+
+  const request = new Request(
+    "https://worker.example/api/projects/caelus/commands",
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        execution_id: executionId,
+        operation: "regenerate_field",
+        content_key: "2099-01-23:ru",
+        payload: { sign: "aries", field: "overview" },
+        idempotency_key: "rpc-string-contract",
+      }),
+    },
+  );
+
+  const response = await handleRequest(
+    request,
+    env(),
+    {
+      store,
+      github: github as any,
+      authenticate,
+    },
+  );
+
+  assert.equal(response.status, 202);
+  assert.equal(await response.json(), executionId);
+  assert.deepEqual(dispatched, [executionId]);
+});
+
 test("new command dispatches its canonical execution exactly once", async () => {
   const store = new FakeStore();
   store.enableDispatchClaims = true;

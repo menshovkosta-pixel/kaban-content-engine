@@ -65,11 +65,19 @@ export async function handleRequest(request: Request, env: Env, deps: WorkerDepe
         idempotency_key: String(body.idempotency_key ?? ""),
       };
       if (!input.execution_id || !input.operation || !input.idempotency_key) throw new HttpError(400, "execution_id, operation и idempotency_key обязательны");
-      const created = first(await deps.store.createCommand(input)) as Record<string, unknown> | null;
+      const created = first(await deps.store.createCommand(input)) as unknown;
       if (!created) throw new HttpError(500, "Command creation returned no execution");
 
-      const canonicalExecutionId = String(created.execution_id ?? "");
-      if (!canonicalExecutionId) throw new HttpError(500, "Command creation returned no execution_id");
+      const canonicalExecutionId =
+        typeof created === "string"
+          ? created
+          : typeof created === "object" && created !== null
+            ? String((created as Record<string, unknown>).execution_id ?? "")
+            : "";
+
+      if (!canonicalExecutionId) {
+        throw new HttpError(500, "Command creation returned no execution_id");
+      }
 
       const execution = first(
         await deps.store.getExecution(projectId, canonicalExecutionId),
