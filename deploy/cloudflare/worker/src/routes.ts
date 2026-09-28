@@ -91,6 +91,11 @@ export async function handleRequest(request: Request, env: Env, deps: WorkerDepe
           try {
             await deps.github.dispatch(claimed.execution_id);
           } catch (_error) {
+            console.error(
+              "GitHub dispatch failed",
+              claimed.execution_id,
+              String(_error),
+            );
             await deps.store.scheduleDispatchRetry(
               claimed,
               new Date(now.getTime() + 10 * 60_000),

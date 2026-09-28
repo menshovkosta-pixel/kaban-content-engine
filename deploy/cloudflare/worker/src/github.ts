@@ -21,7 +21,8 @@ export class GithubDispatchClient implements GithubDispatcher {
     const url = `https://api.github.com/repos/${encodeURIComponent(this.env.GITHUB_OWNER)}/${encodeURIComponent(this.env.GITHUB_REPO)}/actions/workflows/${encodeURIComponent(this.env.GITHUB_WORKFLOW_FILE)}/dispatches`;
     let response: Response;
     try {
-      response = await this.fetcher(url, {
+      const fetcher = this.fetcher;
+      response = await fetcher(url, {
         method: "POST",
         headers: {
           Accept: "application/vnd.github+json",
