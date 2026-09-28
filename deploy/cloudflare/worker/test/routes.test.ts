@@ -8,16 +8,51 @@ function env() {
 class FakeStore {
   calls: any[] = [];
   idem = new Map<string, any>();
+  executions = new Map<string, any>();
+  claimed = new Set<string>();
+  enableDispatchClaims = false;
+
   async listProjects() { return [{ project_id: "caelus" }]; }
+
   async createCommand(input: any) {
     this.calls.push(input);
     const key = `${input.project_id}:${input.idempotency_key}`;
     const existing = this.idem.get(key);
     if (existing) return existing;
-    const row = { execution_id: input.execution_id, project_id: input.project_id, requested_by: input.requested_by };
+
+    const row = {
+      execution_id: input.execution_id,
+      project_id: input.project_id,
+      operation: input.operation,
+      requested_by: input.requested_by,
+      state: "queued",
+      wait_condition: null,
+      misfire_deadline_at: null,
+      retry_deadline_at: null,
+    };
+
     this.idem.set(key, row);
+    this.executions.set(row.execution_id, row);
     return row;
   }
+
+  async getExecution(_projectId: string, executionId: string) {
+    const row = this.executions.get(executionId);
+    return row ? [row] : [];
+  }
+
+  async claimDue(execution: any, _now: Date) {
+    if (!this.enableDispatchClaims) return null;
+    if (this.claimed.has(execution.execution_id)) return null;
+
+    this.claimed.add(execution.execution_id);
+    return {
+      ...execution,
+      dispatch_nonce: `nonce:${execution.execution_id}`,
+    };
+  }
+
+  async scheduleDispatchRetry(_execution: any, _retryAt: Date) {}
 }
 const authenticate = async () => ({ sub: "user-1", email: "user@example.com", actor: "user@example.com" });
 const headers = { "Cf-Access-Jwt-Assertion":"ok", Origin:"https://admin.example.com", "Content-Type":"application/json" };
@@ -69,4 +104,115 @@ test("project health route returns authenticated project-scoped summary", async 
   const body:any=await response.json();
   assert.equal(body.project_id,"caelus");
   assert.equal(body.unknown_delivery_count,1);
+});
+
+test("new command dispatches its canonical execution exactly once", async () => {
+  const store = new FakeStore();
+  store.enableDispatchClaims = true;
+  const dispatched: string[] = [];
+
+  const github = {
+    async dispatch(executionId: string) {
+      dispatched.push(executionId);
+    },
+  };
+
+  const executionId = "22222222-2222-4222-8222-222222222222";
+
+  const request = new Request(
+    "https://worker.example/api/projects/caelus/commands",
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        execution_id: executionId,
+        operation: "approve",
+        content_key: "2026-09-26:ru",
+        content_set_id: null,
+        expected_version: 7,
+        payload: {},
+        idempotency_key: "dispatch-new-command",
+      }),
+    },
+  );
+
+  const response = await handleRequest(
+    request,
+    env(),
+    {
+      store: store as any,
+      github: github as any,
+      authenticate,
+    },
+  );
+
+  assert.equal(response.status, 202);
+  assert.deepEqual(dispatched, [executionId]);
+});
+
+test("idempotent duplicate dispatches only the canonical execution once", async () => {
+  const store = new FakeStore();
+  store.enableDispatchClaims = true;
+  const dispatched: string[] = [];
+
+  const github = {
+    async dispatch(executionId: string) {
+      dispatched.push(executionId);
+    },
+  };
+
+  const firstExecutionId =
+    "33333333-3333-4333-8333-333333333333";
+
+  const duplicateExecutionId =
+    "44444444-4444-4444-8444-444444444444";
+
+  const make = (executionId: string) =>
+    new Request(
+      "https://worker.example/api/projects/caelus/commands",
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          execution_id: executionId,
+          operation: "approve",
+          content_key: "2026-09-26:ru",
+          content_set_id: null,
+          expected_version: 7,
+          payload: {},
+          idempotency_key: "dispatch-same-idem",
+        }),
+      },
+    );
+
+  const first = await handleRequest(
+    make(firstExecutionId),
+    env(),
+    {
+      store: store as any,
+      github: github as any,
+      authenticate,
+    },
+  );
+
+  const second = await handleRequest(
+    make(duplicateExecutionId),
+    env(),
+    {
+      store: store as any,
+      github: github as any,
+      authenticate,
+    },
+  );
+
+  assert.equal(first.status, 202);
+  assert.equal(second.status, 202);
+
+  const firstBody: any = await first.json();
+  const secondBody: any = await second.json();
+
+  assert.equal(firstBody.execution_id, firstExecutionId);
+  assert.equal(secondBody.execution_id, firstExecutionId);
+
+  assert.deepEqual(dispatched, [firstExecutionId]);
 });

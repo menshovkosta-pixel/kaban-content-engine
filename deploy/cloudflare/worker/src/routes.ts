@@ -1,5 +1,5 @@
 import { assertMutationRequest, HttpError, verifyAccess } from "./auth.ts";
-import type { AccessIdentity, CommandInput, Env, WorkerDependencies } from "./types.ts";
+import type { AccessIdentity, CommandInput, DueExecution, Env, WorkerDependencies } from "./types.ts";
 
 function json(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
@@ -65,7 +65,33 @@ export async function handleRequest(request: Request, env: Env, deps: WorkerDepe
         idempotency_key: String(body.idempotency_key ?? ""),
       };
       if (!input.execution_id || !input.operation || !input.idempotency_key) throw new HttpError(400, "execution_id, operation и idempotency_key обязательны");
-      return json(first(await deps.store.createCommand(input)), 202);
+      const created = first(await deps.store.createCommand(input)) as Record<string, unknown> | null;
+      if (!created) throw new HttpError(500, "Command creation returned no execution");
+
+      const canonicalExecutionId = String(created.execution_id ?? "");
+      if (!canonicalExecutionId) throw new HttpError(500, "Command creation returned no execution_id");
+
+      const execution = first(
+        await deps.store.getExecution(projectId, canonicalExecutionId),
+      ) as DueExecution | null;
+
+      if (execution) {
+        const now = new Date();
+        const claimed = await deps.store.claimDue(execution, now);
+
+        if (claimed) {
+          try {
+            await deps.github.dispatch(claimed.execution_id);
+          } catch (_error) {
+            await deps.store.scheduleDispatchRetry(
+              claimed,
+              new Date(now.getTime() + 10 * 60_000),
+            );
+          }
+        }
+      }
+
+      return json(created, 202);
     }
 
     if (request.method === "POST" && parts[3] === "publications" && parts[4] && parts[5] === "reconcile") {
